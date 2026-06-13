@@ -9,15 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
     (id) => loadSession(id),
     () => newChat()
   );
-
-  // Expose for sidebar callbacks
   window._onSelectSession = (id) => {
     loadSession(id);
-    // close mobile sidebar
     document.getElementById('sidebar')?.classList.remove('open');
     document.getElementById('sidebar-overlay')?.classList.remove('show');
   };
-  window._onDeleteSession = (id) => {
-    if (window._currentSessionId === id) newChat();
-  };
+  window._onDeleteSession = (id) => { if (window._currentSessionId === id) newChat(); };
 });
