@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #0f0f0f;
+  --bg-2: #1a1a1a;
+  --bg-3: #222222;
+  --sidebar-bg: #141414;
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.14);
+  --text: #e8e8e8;
+  --text-2: #a0a0a0;
+  --text-3: #606060;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-dim: rgba(59,130,246,0.15);
+  --bubble-user: #1e3a5f;
+  --bubble-user-border: rgba(59,130,246,0.3);
+  --bubble-ai: #1c1c1c;
+  --bubble-ai-border: rgba(255,255,255,0.06);
+  --danger: #ef4444;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --sidebar-w: 260px;
+  --transition: 0.18s ease;
+}
+
+[data-theme="light"] {
+  --bg: #fafafa;
+  --bg-2: #f0f0f0;
+  --bg-3: #e8e8e8;
+  --sidebar-bg: #f4f4f4;
+  --border: rgba(0,0,0,0.08);
+  --border-hover: rgba(0,0,0,0.15);
+  --text: #111111;
+  --text-2: #555555;
+  --text-3: #999999;
+  --bubble-user: #dbeafe;
+  --bubble-user-border: rgba(59,130,246,0.25);
+  --bubble-ai: #ffffff;
+  --bubble-ai-border: rgba(0,0,0,0.07);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { height: 100%; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.6;
+  transition: background var(--transition), color var(--transition);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+
+input, textarea {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+
+::selection { background: var(--accent-dim); }
+
+/* Syntax highlight overrides */
+.hljs { background: transparent !important; padding: 0 !important; }
