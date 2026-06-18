@@ -1,38 +1,33 @@
 import Storage from './storage.js';
 
-const TYPE_ICON = { chat:'💬', image:'🖼️', audio:'🎵', video:'🎬', embedding:'🔢' };
+const TYPE_ICON  = { chat:'💬', image:'🖼️', audio:'🎵', video:'🎬', embedding:'🔢' };
 const TYPE_LABEL = { chat:'Chat', image:'Gambar', audio:'Audio', video:'Video', embedding:'Embedding' };
 
 const PROVIDERS = {
-  groq:        { name:'Groq',                keyRequired:true,  placeholder:'gsk_xxxxxxxxxxxx',  imageProvider:false },
-  openrouter:  { name:'OpenRouter',           keyRequired:true,  placeholder:'sk-or-xxxxxxxxxx',  imageProvider:false },
-  gemini:      { name:'Google Gemini',        keyRequired:true,  placeholder:'AIzaSyxxxxxxxxxx',  imageProvider:false },
-  pollinations:{ name:'Pollinations (Gratis)',keyRequired:false, placeholder:'',                  imageProvider:true  },
-  together:    { name:'Together AI',          keyRequired:true,  placeholder:'xxxxxxxxxxxxxxxxx', imageProvider:true  },
+  groq:         { name:'Groq',                  keyRequired:true,  placeholder:'gsk_xxxxxxxxxxxx',  imageProvider:false, note:'' },
+  openrouter:   { name:'OpenRouter',             keyRequired:true,  placeholder:'sk-or-xxxxxxxxxx',  imageProvider:false, note:'Beberapa model gratis tersedia' },
+  gemini:       { name:'Google Gemini',          keyRequired:true,  placeholder:'AIzaSyxxxxxxxxxx',  imageProvider:false, note:'' },
+  pollinations: { name:'Pollinations.ai',        keyRequired:true,  placeholder:'sk_xxxx atau pk_xxxx', imageProvider:true, note:'Key gratis di enter.pollinations.ai' },
 };
 
 export function initSidebar(onSelectSession, onNewChat) {
-  const sidebar   = document.getElementById('sidebar');
-  const overlay   = document.getElementById('sidebar-overlay');
+  const sidebar      = document.getElementById('sidebar');
+  const overlay      = document.getElementById('sidebar-overlay');
   const btnHamburger = document.getElementById('btn-hamburger');
-  const btnClose  = document.getElementById('btn-sidebar-close');
-  const btnNew    = document.getElementById('btn-new-chat');
-  const btnSettings = document.getElementById('btn-settings');
-
+  const btnClose     = document.getElementById('btn-sidebar-close');
+  const btnNew       = document.getElementById('btn-new-chat');
+  const btnSettings  = document.getElementById('btn-settings');
   const viewHistory  = document.getElementById('sidebar-view-history');
   const viewSettings = document.getElementById('sidebar-view-settings');
 
-  // Mobile open/close
   btnHamburger?.addEventListener('click', () => { sidebar.classList.add('open'); overlay.classList.add('show'); });
   btnClose?.addEventListener('click', closeSidebar);
   overlay?.addEventListener('click', closeSidebar);
 
   function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
 
-  // New chat
   btnNew?.addEventListener('click', () => { closeSidebar(); onNewChat(); renderHistory(); });
 
-  // Toggle settings
   let settingsOpen = false;
   btnSettings?.addEventListener('click', () => {
     settingsOpen = !settingsOpen;
@@ -44,14 +39,13 @@ export function initSidebar(onSelectSession, onNewChat) {
     if (settingsOpen) initSettingsView();
   });
 
-  // History item click
   window._onSelectSession = (id) => { onSelectSession(id); closeSidebar(); };
   window._onDeleteSession = (id) => { if (window._currentSessionId === id) onNewChat(); };
 
   renderHistory();
 }
 
-// ── History ──────────────────────────────────────────────────────
+// ── History ───────────────────────────────────────────────────────
 export function renderHistory(activeId = null) {
   const list = document.getElementById('history-list');
   if (!list) return;
@@ -90,7 +84,6 @@ function initSettingsView() {
   const providerSel = document.getElementById('settings-provider');
   if (!providerSel) return;
 
-  // Populate provider options
   providerSel.innerHTML = Object.entries(PROVIDERS)
     .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('');
 
@@ -99,49 +92,51 @@ function initSettingsView() {
 
   renderSettingsForProvider(providerSel.value);
 
-  providerSel.addEventListener('change', () => {
+  providerSel.onchange = () => {
     Storage.saveSettings({ chatProvider: providerSel.value });
     renderSettingsForProvider(providerSel.value);
-  });
+  };
 }
 
 function renderSettingsForProvider(providerId) {
   const cfg = PROVIDERS[providerId];
   const saved = Storage.getSettings();
   const currentKey = saved.apiKeys?.[providerId] || '';
-  const hasKey = !!currentKey;
 
   // Key section
   const keySection = document.getElementById('settings-key-section');
+  const noteEl = document.getElementById('settings-provider-note');
+
   if (cfg.keyRequired) {
     keySection.classList.remove('hidden');
     document.getElementById('settings-key-input').value = currentKey;
     document.getElementById('settings-key-input').placeholder = cfg.placeholder;
-    updateKeyStatus(hasKey);
   } else {
     keySection.classList.add('hidden');
   }
 
+  if (noteEl) {
+    noteEl.textContent = cfg.note || '';
+    noteEl.style.display = cfg.note ? 'block' : 'none';
+  }
+
+  updateKeyStatus(!!currentKey);
+
   // Bind save key
-  const btnSave = document.getElementById('btn-save-settings-key');
-  btnSave.onclick = () => {
+  document.getElementById('btn-save-settings-key').onclick = () => {
     const val = document.getElementById('settings-key-input').value.trim();
     Storage.saveSettings({ apiKeys: { [providerId]: val } });
     updateKeyStatus(!!val);
-    loadModels(providerId, val);
+    loadAllModels(providerId, val);
     showToast(val ? '✓ Key tersimpan' : 'Key dikosongkan');
   };
 
-  // Toggle key visibility
   document.getElementById('btn-toggle-settings-key').onclick = () => {
     const inp = document.getElementById('settings-key-input');
     inp.type = inp.type === 'password' ? 'text' : 'password';
   };
 
-  loadModels(providerId, currentKey);
-
-  // If provider supports image, also load image models
-  if (cfg.imageProvider) loadImageModels(providerId, currentKey);
+  loadAllModels(providerId, currentKey);
 }
 
 function updateKeyStatus(hasKey) {
@@ -151,58 +146,67 @@ function updateKeyStatus(hasKey) {
   el.className = 'key-status ' + (hasKey ? 'active' : '');
 }
 
-async function loadModels(providerId, apiKey) {
-  const container = document.getElementById('settings-chat-models');
+async function loadAllModels(providerId, apiKey) {
+  const cfg = PROVIDERS[providerId];
+
+  // Chat models
+  await loadModelGroup(providerId, apiKey, providerId, 'settings-chat-models', 'chatModels');
+
+  // Image models (only for providers that support it)
+  const imgSection = document.getElementById('settings-image-models');
+  if (cfg.imageProvider) {
+    imgSection.classList.remove('hidden');
+    await loadModelGroup(providerId, apiKey, `${providerId}_image`, 'settings-image-models-list', 'imageModels');
+
+    // Audio models (only Pollinations)
+    if (providerId === 'pollinations') {
+      const audioSection = document.getElementById('settings-audio-models');
+      if (audioSection) {
+        audioSection.classList.remove('hidden');
+        await loadModelGroup(providerId, apiKey, 'pollinations_audio', 'settings-audio-models-list', 'audioModels');
+      }
+    }
+  } else {
+    imgSection.classList.add('hidden');
+    const audioSection = document.getElementById('settings-audio-models');
+    if (audioSection) audioSection.classList.add('hidden');
+  }
+}
+
+async function loadModelGroup(providerId, apiKey, fetchKey, containerId, storageKey) {
+  const container = document.getElementById(containerId);
   if (!container) return;
-  container.innerHTML = `<div class="models-loading">Memuat model…</div>`;
+  container.innerHTML = `<div class="models-loading">Memuat…</div>`;
   try {
     const res = await fetch('/api/providers/models', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: providerId, apiKey }),
+      body: JSON.stringify({ provider: fetchKey, apiKey }),
     });
     const data = await res.json();
-    renderModelList(container, data.models || [], 'chat_model', providerId, 'chatModels');
+    renderModelList(container, data.models || [], providerId, storageKey);
   } catch { container.innerHTML = '<div class="models-error">Gagal memuat.</div>'; }
 }
 
-async function loadImageModels(providerId, apiKey) {
-  const container = document.getElementById('settings-image-models');
-  if (!container) return;
-  container.classList.remove('hidden');
-  container.innerHTML = `<div class="models-loading">Memuat model gambar…</div>`;
-  const imageKey = providerId === 'pollinations' ? 'pollinations_image' : providerId + '_image';
-  try {
-    const res = await fetch('/api/providers/models', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: imageKey, apiKey }),
-    });
-    const data = await res.json();
-    renderModelList(container, data.models || [], 'image_model', providerId, 'imageModels');
-  } catch { container.innerHTML = '<div class="models-error">Gagal memuat.</div>'; }
-}
-
-function renderModelList(container, models, radioName, providerId, storageKey) {
+function renderModelList(container, models, providerId, storageKey) {
   if (!models.length) { container.innerHTML = '<div class="models-error">Tidak ada model.</div>'; return; }
 
   const saved = Storage.getSettings();
   const selectedModel = saved[storageKey]?.[providerId] || '';
 
-  // Group by type
   const groups = {};
-  models.forEach(m => { const t = m.type || 'chat'; (groups[t] = groups[t]||[]).push(m); });
+  models.forEach(m => { const t = m.type || 'chat'; (groups[t] = groups[t] || []).push(m); });
 
   const typeOrder = ['chat','image','audio','video','embedding'];
   let html = '';
   for (const type of typeOrder) {
     if (!groups[type]) continue;
-    html += `<div class="model-group-label">${TYPE_ICON[type] || '•'} ${TYPE_LABEL[type] || type}</div>`;
     html += groups[type].map((m, i) => {
-      const isSelected = selectedModel === m.id || (!selectedModel && type === 'chat' && i === 0 && storageKey === 'chatModels');
+      const isSelected = selectedModel ? selectedModel === m.id : (i === 0);
       return `
         <label class="model-option ${isSelected ? 'selected' : ''}">
-          <input type="radio" name="${radioName}_${providerId}" value="${m.id}" ${isSelected ? 'checked' : ''}>
+          <input type="radio" name="${storageKey}_${providerId}" value="${m.id}" ${isSelected ? 'checked' : ''}>
           <div class="model-info">
-            <span class="model-name">${esc(m.name)}</span>
+            <span class="model-name">${TYPE_ICON[type] || '•'} ${esc(m.name)}</span>
             ${m.desc ? `<span class="model-desc">${esc(m.desc)}</span>` : ''}
           </div>
         </label>`;
@@ -210,13 +214,11 @@ function renderModelList(container, models, radioName, providerId, storageKey) {
   }
   container.innerHTML = html;
 
-  // Auto-save first if none selected
   if (!selectedModel && models.length) {
-    const firstChat = models.find(m => m.type === 'chat' || !m.type) || models[0];
-    Storage.saveSettings({ [storageKey]: { [providerId]: firstChat.id } });
+    Storage.saveSettings({ [storageKey]: { [providerId]: models[0].id } });
   }
 
-  container.querySelectorAll(`input[name="${radioName}_${providerId}"]`).forEach(radio => {
+  container.querySelectorAll(`input[name="${storageKey}_${providerId}"]`).forEach(radio => {
     radio.addEventListener('change', () => {
       Storage.saveSettings({ [storageKey]: { [providerId]: radio.value } });
       container.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
@@ -229,8 +231,7 @@ function renderModelList(container, models, radioName, providerId, storageKey) {
 function showToast(msg) {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.textContent = msg;
-  t.classList.add('show');
+  t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2000);
 }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
