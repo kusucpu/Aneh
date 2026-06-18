@@ -1,3 +1,10 @@
+const DEFAULT_MODELS = {
+  groq: 'llama-3.3-70b-versatile',
+  openrouter: 'meta-llama/llama-3.3-70b-instruct:free',
+  gemini: 'gemini-2.0-flash',
+  pollinations: 'openai',
+};
+
 const Storage = {
   getSessions() {
     try { return JSON.parse(localStorage.getItem('aneh_sessions') || '[]'); } catch { return []; }
@@ -31,7 +38,8 @@ const Storage = {
     return {
       provider,
       apiKey: s.apiKeys?.[provider] || '',
-      model: s.chatModels?.[provider] || '',
+      // Default model per provider kalau belum dipilih
+      model: s.chatModels?.[provider] || DEFAULT_MODELS[provider] || '',
     };
   },
   getActiveImage() {
