@@ -4,10 +4,10 @@ const TYPE_ICON  = { chat:'💬', image:'🖼️', audio:'🎵', video:'🎬', e
 const TYPE_LABEL = { chat:'Chat', image:'Gambar', audio:'Audio', video:'Video', embedding:'Embedding' };
 
 const PROVIDERS = {
-  groq:         { name:'Groq',                  keyRequired:true,  placeholder:'gsk_xxxxxxxxxxxx',  imageProvider:false, note:'' },
-  openrouter:   { name:'OpenRouter',             keyRequired:true,  placeholder:'sk-or-xxxxxxxxxx',  imageProvider:false, note:'Beberapa model gratis tersedia' },
-  gemini:       { name:'Google Gemini',          keyRequired:true,  placeholder:'AIzaSyxxxxxxxxxx',  imageProvider:false, note:'' },
-  pollinations: { name:'Pollinations.ai',        keyRequired:true,  placeholder:'sk_xxxx atau pk_xxxx', imageProvider:true, note:'Key gratis di enter.pollinations.ai' },
+  groq:         { name:'Groq',                  keyRequired:false, serverKey:true,  placeholder:'gsk_xxxxxxxxxxxx (opsional)', imageProvider:false, note:'Key server sudah tersedia. Isi jika ingin pakai key sendiri.' },
+  openrouter:   { name:'OpenRouter',             keyRequired:true,  serverKey:false, placeholder:'sk-or-xxxxxxxxxx',            imageProvider:false, note:'Beberapa model gratis tersedia' },
+  gemini:       { name:'Google Gemini',          keyRequired:true,  serverKey:false, placeholder:'AIzaSyxxxxxxxxxx',            imageProvider:false, note:'' },
+  pollinations: { name:'Pollinations.ai',        keyRequired:true,  serverKey:false, placeholder:'sk_xxxx atau pk_xxxx',        imageProvider:true,  note:'Key gratis di enter.pollinations.ai' },
 };
 
 export function initSidebar(onSelectSession, onNewChat) {
@@ -107,26 +107,23 @@ function renderSettingsForProvider(providerId) {
   const keySection = document.getElementById('settings-key-section');
   const noteEl = document.getElementById('settings-provider-note');
 
-  if (cfg.keyRequired) {
-    keySection.classList.remove('hidden');
-    document.getElementById('settings-key-input').value = currentKey;
-    document.getElementById('settings-key-input').placeholder = cfg.placeholder;
-  } else {
-    keySection.classList.add('hidden');
-  }
+  // Show key input for all providers (groq = optional, others = required)
+  keySection.classList.remove('hidden');
+  document.getElementById('settings-key-input').value = currentKey;
+  document.getElementById('settings-key-input').placeholder = cfg.placeholder;
 
   if (noteEl) {
     noteEl.textContent = cfg.note || '';
     noteEl.style.display = cfg.note ? 'block' : 'none';
   }
 
-  updateKeyStatus(!!currentKey);
+  updateKeyStatus(!!currentKey, providerId);
 
   // Bind save key
   document.getElementById('btn-save-settings-key').onclick = () => {
     const val = document.getElementById('settings-key-input').value.trim();
     Storage.saveSettings({ apiKeys: { [providerId]: val } });
-    updateKeyStatus(!!val);
+    updateKeyStatus(!!val, providerId);
     loadAllModels(providerId, val);
     showToast(val ? '✓ Key tersimpan' : 'Key dikosongkan');
   };
@@ -139,11 +136,20 @@ function renderSettingsForProvider(providerId) {
   loadAllModels(providerId, currentKey);
 }
 
-function updateKeyStatus(hasKey) {
+function updateKeyStatus(hasKey, providerId) {
   const el = document.getElementById('settings-key-status');
   if (!el) return;
-  el.textContent = hasKey ? '● Aktif' : '○ Belum diset';
-  el.className = 'key-status ' + (hasKey ? 'active' : '');
+  const cfg = PROVIDERS[providerId || 'groq'];
+  if (hasKey) {
+    el.textContent = '● Key kamu aktif';
+    el.className = 'key-status active';
+  } else if (cfg?.serverKey) {
+    el.textContent = '● Server key aktif';
+    el.className = 'key-status active';
+  } else {
+    el.textContent = '○ Belum diset';
+    el.className = 'key-status';
+  }
 }
 
 async function loadAllModels(providerId, apiKey) {
