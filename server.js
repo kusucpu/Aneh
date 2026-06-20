@@ -2,10 +2,24 @@ const express = require('express');
 const path = require('path');
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const POLL_BASE = 'https://gen.pollinations.ai';
+
+// ── Helper: bersihin history chat sebelum dikirim ke provider ─────
+// Pesan gambar/audio/video/upload punya field tambahan (type, dll) yang
+// bikin beberapa provider (Groq, Gemini) ngambek "property unsupported".
+// Jadi semua history diringkas jadi {role, content} polos.
+function toApiMessages(messages) {
+  const labels = { image: '[gambar]', video: '[video]', audio: '[audio]', music: '[musik]', upload: '[file]' };
+  return (messages || []).map(m => {
+    if (m.type && m.type !== 'text') {
+      return { role: m.role, content: labels[m.type] || '[media]' };
+    }
+    return { role: m.role, content: typeof m.content === 'string' ? m.content : String(m.content) };
+  });
+}
 
 // ── Chat ─────────────────────────────────────────────────────────
 app.post('/api/chat', async (req, res) => {
@@ -31,7 +45,7 @@ app.post('/api/chat', async (req, res) => {
       headers: { 'Content-Type': 'application/json', ...cfg.headers },
       body: JSON.stringify({
         model: model || DEFAULT_MODEL[provider] || '',
-        messages,
+        messages: toApiMessages(messages),
         max_tokens: 2048,
         stream: true,
       }),
@@ -67,9 +81,7 @@ app.post('/api/providers/models', async (req, res) => {
 
     if (provider === 'groq') {
       if (!key) return res.json({ models: DEFAULTS.groq });
-      const r = await fetch('https://api.groq.com/openai/v1/models', {
-        headers: { 'Authorization': `Bearer ${key}` }
-      });
+      const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { 'Authorization': `Bearer ${key}` } });
       if (r.ok) {
         const d = await r.json();
         models = d.data
@@ -82,13 +94,9 @@ app.post('/api/providers/models', async (req, res) => {
       } else models = DEFAULTS.groq;
 
     } else if (provider === 'openrouter') {
-      // Fetch all free models from OpenRouter
-      const r = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: key ? { 'Authorization': `Bearer ${key}` } : {}
-      });
+      const r = await fetch('https://openrouter.ai/api/v1/models', { headers: key ? { 'Authorization': `Bearer ${key}` } : {} });
       if (r.ok) {
         const d = await r.json();
-        // Filter: free + not deprecated + has been updated recently
         models = d.data
           .filter(m => m.id.endsWith(':free'))
           .filter(m => !m.id.includes('auto'))
@@ -97,8 +105,7 @@ app.post('/api/providers/models', async (req, res) => {
             name: m.name || m.id.split('/').pop().replace(':free',''),
             desc: m.context_length ? `${Math.round(m.context_length/1000)}k ctx · Gratis` : 'Gratis',
             type: 'chat',
-          }))
-          .slice(0, 30);
+          })).slice(0, 30);
         if (!models.length) models = DEFAULTS.openrouter;
       } else models = DEFAULTS.openrouter;
 
@@ -120,18 +127,12 @@ app.post('/api/providers/models', async (req, res) => {
       } else models = DEFAULTS.gemini;
 
     } else if (provider === 'pollinations') {
-      // Fetch text models dari endpoint baru
       const headers = key ? { 'Authorization': `Bearer ${key}` } : {};
       const r = await fetch(`${POLL_BASE}/text/models`, { headers }).catch(() => null);
       if (r?.ok) {
         const d = await r.json();
         models = Array.isArray(d)
-          ? d.map(m => ({
-              id: m.name || m.id || m,
-              name: m.name || m.id || m,
-              desc: m.description ? m.description.slice(0, 55) : 'Pollinations',
-              type: 'chat',
-            }))
+          ? d.map(m => ({ id: m.name || m.id || m, name: m.name || m.id || m, desc: m.description ? m.description.slice(0,55) : 'Pollinations', type: 'chat' }))
           : DEFAULTS.pollinations_text;
       } else models = DEFAULTS.pollinations_text;
 
@@ -141,12 +142,7 @@ app.post('/api/providers/models', async (req, res) => {
       if (r?.ok) {
         const d = await r.json();
         models = Array.isArray(d)
-          ? d.map(m => ({
-              id: m.name || m.id || m,
-              name: m.name || m.id || m,
-              desc: m.description ? m.description.slice(0, 55) : '',
-              type: 'image',
-            }))
+          ? d.map(m => ({ id: m.name || m.id || m, name: m.name || m.id || m, desc: m.description ? m.description.slice(0,55) : '', type: 'image' }))
           : DEFAULTS.pollinations_image;
       } else models = DEFAULTS.pollinations_image;
 
@@ -156,12 +152,7 @@ app.post('/api/providers/models', async (req, res) => {
       if (r?.ok) {
         const d = await r.json();
         models = Array.isArray(d)
-          ? d.map(m => ({
-              id: m.name || m.id || m,
-              name: m.name || m.id || m,
-              desc: m.description || '',
-              type: 'audio',
-            }))
+          ? d.map(m => ({ id: m.name || m.id || m, name: m.name || m.id || m, desc: m.description || '', type: 'audio' }))
           : DEFAULTS.pollinations_audio;
       } else models = DEFAULTS.pollinations_audio;
     }
@@ -170,15 +161,25 @@ app.post('/api/providers/models', async (req, res) => {
   } catch { res.json({ models: DEFAULTS[provider] || [] }); }
 });
 
+// ── Helper: ratio -> width/height ──────────────────────────────────
+function ratioToWH(ratio) {
+  const map = {
+    '1:1':  { w: 1024, h: 1024 },
+    '9:16': { w: 720,  h: 1280 },
+    '16:9': { w: 1280, h: 720  },
+  };
+  return map[ratio] || map['1:1'];
+}
+
 // ── Image ─────────────────────────────────────────────────────────
 app.post('/api/image', async (req, res) => {
-  const { prompt, provider = 'pollinations', model, apiKey, width = 1024, height = 1024 } = req.body;
+  const { prompt, provider = 'pollinations', model, apiKey, ratio = '1:1' } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt diperlukan.' });
-
   try {
     if (provider === 'pollinations') {
+      const { w, h } = ratioToWH(ratio);
       const seed = Math.floor(Math.random() * 999999);
-      const params = new URLSearchParams({ model: model || 'flux', width, height, nologo: 'true', seed });
+      const params = new URLSearchParams({ model: model || 'flux', width: w, height: h, nologo: 'true', seed });
       if (apiKey) params.set('key', apiKey);
       return res.json({ url: `${POLL_BASE}/image/${encodeURIComponent(prompt)}?${params}` });
     }
@@ -186,13 +187,28 @@ app.post('/api/image', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── Audio (TTS via Pollinations) ──────────────────────────────────
+// ── Video ─────────────────────────────────────────────────────────
+app.post('/api/video', async (req, res) => {
+  const { prompt, model = 'veo', apiKey, ratio = '1:1', duration = 4 } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'Prompt diperlukan.' });
+  try {
+    const params = new URLSearchParams({ model, duration, aspectRatio: ratio });
+    if (apiKey) params.set('key', apiKey);
+    res.json({ url: `${POLL_BASE}/video/${encodeURIComponent(prompt)}?${params}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Audio (speech / music) ─────────────────────────────────────────
 app.post('/api/audio', async (req, res) => {
-  const { text, voice = 'nova', apiKey } = req.body;
-  if (!text) return res.status(400).json({ error: 'Teks diperlukan.' });
-  const params = new URLSearchParams({ voice });
-  if (apiKey) params.set('key', apiKey);
-  res.json({ url: `${POLL_BASE}/audio/${encodeURIComponent(text)}?${params}` });
+  const { text, voice = 'nova', model, apiKey } = req.body;
+  if (!text) return res.status(400).json({ error: 'Teks/prompt diperlukan.' });
+  try {
+    const params = new URLSearchParams();
+    if (model) params.set('model', model);
+    else if (voice) params.set('voice', voice);
+    if (apiKey) params.set('key', apiKey);
+    res.json({ url: `${POLL_BASE}/audio/${encodeURIComponent(text)}?${params}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -202,10 +218,7 @@ const DEFAULT_MODEL = {
   gemini: 'gemini-2.0-flash',
   pollinations: 'openai',
 };
-
-function fmtName(id) {
-  return id.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
+function fmtName(id) { return id.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); }
 function modelType(provider, id) {
   if (provider === 'gemini') {
     if (id.includes('imagen')) return 'image';
@@ -225,18 +238,18 @@ const DEFAULTS = {
     { id:'whisper-large-v3-turbo',            name:'Whisper Large V3 Turbo',desc:'STT cepat',             type:'audio' },
   ],
   openrouter: [
-    { id:'meta-llama/llama-3.3-70b-instruct:free',          name:'Llama 3.3 70B',      desc:'Gratis', type:'chat' },
-    { id:'deepseek/deepseek-r1:free',                       name:'DeepSeek R1',         desc:'Gratis, reasoning', type:'chat' },
-    { id:'mistralai/mistral-7b-instruct:free',              name:'Mistral 7B',          desc:'Gratis, cepat', type:'chat' },
-    { id:'google/gemma-2-9b-it:free',                       name:'Gemma 2 9B',          desc:'Gratis', type:'chat' },
-    { id:'microsoft/phi-3-mini-128k-instruct:free',         name:'Phi-3 Mini 128k',     desc:'Gratis, 128k ctx', type:'chat' },
-    { id:'nousresearch/hermes-3-llama-3.1-405b:free',       name:'Hermes 3 405B',       desc:'Gratis, besar', type:'chat' },
+    { id:'meta-llama/llama-3.3-70b-instruct:free', name:'Llama 3.3 70B', desc:'Gratis', type:'chat' },
+    { id:'deepseek/deepseek-r1:free',              name:'DeepSeek R1',   desc:'Gratis, reasoning', type:'chat' },
+    { id:'mistralai/mistral-7b-instruct:free',     name:'Mistral 7B',    desc:'Gratis, cepat', type:'chat' },
+    { id:'google/gemma-2-9b-it:free',              name:'Gemma 2 9B',    desc:'Gratis', type:'chat' },
+    { id:'microsoft/phi-3-mini-128k-instruct:free',name:'Phi-3 Mini 128k', desc:'Gratis, 128k ctx', type:'chat' },
+    { id:'nousresearch/hermes-3-llama-3.1-405b:free', name:'Hermes 3 405B', desc:'Gratis, besar', type:'chat' },
   ],
   gemini: [
-    { id:'gemini-2.0-flash',       name:'Gemini 2.0 Flash',    desc:'Terbaru & cepat',   type:'chat' },
-    { id:'gemini-1.5-flash',       name:'Gemini 1.5 Flash',    desc:'Cepat & efisien',   type:'chat' },
-    { id:'gemini-1.5-pro',         name:'Gemini 1.5 Pro',      desc:'Paling pintar',     type:'chat' },
-    { id:'gemini-1.5-flash-8b',    name:'Gemini 1.5 Flash 8B', desc:'Paling ringan',     type:'chat' },
+    { id:'gemini-2.5-flash',       name:'Gemini 2.5 Flash',    desc:'Terbaru, paling stabil', type:'chat' },
+    { id:'gemini-2.0-flash',       name:'Gemini 2.0 Flash',    desc:'Cepat',                  type:'chat' },
+    { id:'gemini-1.5-flash',       name:'Gemini 1.5 Flash',    desc:'Cepat & efisien',        type:'chat' },
+    { id:'gemini-1.5-pro',         name:'Gemini 1.5 Pro',      desc:'Paling pintar',          type:'chat' },
   ],
   pollinations_text: [
     { id:'openai',         name:'GPT-4o (via Pollinations)', desc:'Kuat & populer',  type:'chat' },
@@ -253,9 +266,9 @@ const DEFAULTS = {
     { id:'flux-realism',   name:'FLUX Realism',  desc:'Foto realistis',    type:'image' },
     { id:'gptimage',       name:'GPT Image',     desc:'OpenAI DALL-E',     type:'image' },
     { id:'grok-imagine',   name:'Grok Imagine',  desc:'xAI image gen',     type:'image' },
-    { id:'kontext',        name:'Kontext',        desc:'Context-aware',     type:'image' },
+    { id:'kontext',        name:'Kontext',       desc:'Context-aware',     type:'image' },
     { id:'seedream',       name:'SeDream',       desc:'Variatif',          type:'image' },
-    { id:'turbo',          name:'Turbo',          desc:'Lebih cepat',       type:'image' },
+    { id:'turbo',          name:'Turbo',         desc:'Lebih cepat',       type:'image' },
   ],
   pollinations_audio: [
     { id:'elevenlabs',   name:'ElevenLabs',   desc:'Kualitas premium',  type:'audio' },
