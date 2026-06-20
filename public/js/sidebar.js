@@ -88,7 +88,12 @@ function initSettingsView() {
     .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('');
 
   const saved = Storage.getSettings();
-  providerSel.value = saved.chatProvider || 'groq';
+  let initialProvider = saved.chatProvider || 'groq';
+  if (!PROVIDERS[initialProvider]) {
+    initialProvider = 'groq';
+    Storage.saveSettings({ chatProvider: 'groq' });
+  }
+  providerSel.value = initialProvider;
 
   renderSettingsForProvider(providerSel.value);
 
