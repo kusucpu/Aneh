@@ -4,10 +4,10 @@ const TYPE_ICON  = { chat:'💬', image:'🖼️', audio:'🎵', video:'🎬', e
 const TYPE_LABEL = { chat:'Chat', image:'Gambar', audio:'Audio', video:'Video', embedding:'Embedding' };
 
 const PROVIDERS = {
-  groq:         { name:'Groq',                  keyRequired:false, serverKey:true,  placeholder:'gsk_xxxxxxxxxxxx (opsional)', imageProvider:false, note:'Key server sudah tersedia. Isi jika ingin pakai key sendiri.' },
-  openrouter:   { name:'OpenRouter',             keyRequired:true,  serverKey:false, placeholder:'sk-or-xxxxxxxxxx',            imageProvider:false, note:'Beberapa model gratis tersedia' },
-  gemini:       { name:'Google Gemini',          keyRequired:true,  serverKey:false, placeholder:'AIzaSyxxxxxxxxxx',            imageProvider:false, note:'' },
-  pollinations: { name:'Pollinations.ai',        keyRequired:true,  serverKey:false, placeholder:'sk_xxxx atau pk_xxxx',        imageProvider:true,  note:'Key gratis di enter.pollinations.ai' },
+  groq:         { name:'Groq',                  keyRequired:false, serverKey:true,  placeholder:'gsk_xxxxxxxxxxxx (boleh kosong)', imageProvider:false, note:'Key server udah standby gan, gratis tis-tisan! 😎 Mau pake jurus key sendiri? Gas isi di bawah.' },
+  openrouter:   { name:'OpenRouter',             keyRequired:true,  serverKey:false, placeholder:'sk-or-xxxxxxxxxx',            imageProvider:false, note:'Model gratisan numpuk di sini, tapi kadang rame & ngambek. Eror? Cus pindah model laen aja 🙃' },
+  gemini:       { name:'Google Gemini',          keyRequired:true,  serverKey:false, placeholder:'AIzaSyxxxxxxxxxx',            imageProvider:false, note:'Buatan Google, encer & pinter — tapi jatah gratisnya suka pelit 😅' },
+  pollinations: { name:'Pollinations.ai',        keyRequired:true,  serverKey:false, placeholder:'sk_xxxx atau pk_xxxx',        imageProvider:true,  note:'Butuh key dulu biar gaspol. Jajan gratis di enter.pollinations.ai 🍯🔑' },
 };
 
 export function initSidebar(onSelectSession, onNewChat) {
