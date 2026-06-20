@@ -7,10 +7,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const POLL_BASE = 'https://gen.pollinations.ai';
 
-// ── Helper: bersihin history chat sebelum dikirim ke provider ─────
-// Pesan gambar/audio/video/upload punya field tambahan (type, dll) yang
-// bikin beberapa provider (Groq, Gemini) ngambek "property unsupported".
-// Jadi semua history diringkas jadi {role, content} polos.
 function toApiMessages(messages) {
   const labels = { image: '[gambar]', video: '[video]', audio: '[audio]', music: '[musik]', upload: '[file]' };
   return (messages || []).map(m => {
