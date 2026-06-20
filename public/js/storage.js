@@ -1,10 +1,28 @@
+// ── Version migration ─────────────────────────────────────────────
+const SETTINGS_VERSION = 4;
+const VALID_PROVIDERS = ['groq', 'openrouter', 'gemini', 'pollinations'];
+
+(function migrate() {
+  const stored = parseInt(localStorage.getItem('aneh_version') || '0');
+  if (stored < SETTINGS_VERSION) {
+    localStorage.removeItem('aneh_settings');
+    localStorage.setItem('aneh_version', String(SETTINGS_VERSION));
+  }
+})();
+
+// ── Default models ────────────────────────────────────────────────
 const DEFAULT_MODELS = {
-  groq: 'llama-3.3-70b-versatile',
-  openrouter: 'meta-llama/llama-3.3-70b-instruct:free',
-  gemini: 'gemini-2.0-flash',
+  groq:         'llama-3.3-70b-versatile',
+  openrouter:   'meta-llama/llama-3.3-70b-instruct:free',
+  gemini:       'gemini-2.0-flash',
   pollinations: 'openai',
 };
 
+const DEFAULT_IMAGE_MODELS = {
+  pollinations: 'flux',
+};
+
+// ── Storage ───────────────────────────────────────────────────────
 const Storage = {
   getSessions() {
     try { return JSON.parse(localStorage.getItem('aneh_sessions') || '[]'); } catch { return []; }
@@ -32,23 +50,30 @@ const Storage = {
     localStorage.setItem('aneh_settings', JSON.stringify(merged));
     return merged;
   },
+
   getActiveChat() {
     const s = this.getSettings();
-    const provider = s.chatProvider || 'groq';
+    // Validasi provider — kalau invalid (e.g. 'together' dari versi lama), fall back ke groq
+    let provider = s.chatProvider || 'groq';
+    if (!VALID_PROVIDERS.includes(provider)) {
+      provider = 'groq';
+      this.saveSettings({ chatProvider: 'groq' });
+    }
     return {
       provider,
-      apiKey: s.apiKeys?.[provider] || '',
-      // Default model per provider kalau belum dipilih
-      model: s.chatModels?.[provider] || DEFAULT_MODELS[provider] || '',
+      apiKey:  s.apiKeys?.[provider]    || '',
+      model:   s.chatModels?.[provider] || DEFAULT_MODELS[provider] || '',
     };
   },
+
   getActiveImage() {
     const s = this.getSettings();
-    const provider = s.imageProvider || 'pollinations';
+    let provider = s.imageProvider || 'pollinations';
+    if (!VALID_PROVIDERS.includes(provider)) provider = 'pollinations';
     return {
-      provider: provider === 'pollinations' ? 'pollinations' : provider,
-      apiKey: s.apiKeys?.[provider] || '',
-      model: s.imageModels?.[provider] || 'flux',
+      provider,
+      apiKey: s.apiKeys?.[provider]     || '',
+      model:  s.imageModels?.[provider] || DEFAULT_IMAGE_MODELS[provider] || 'flux',
     };
   },
 };
