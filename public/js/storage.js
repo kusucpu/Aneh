@@ -54,6 +54,8 @@ async function idbDelete(id) {
   });
 }
 
+// ── Migrasi sekali jalan: localStorage lama -> IndexedDB ──────────
+// Biar history chat yang udah ada sebelum update ini ga hilang.
 const migrationPromise = (async () => {
   if (localStorage.getItem('aneh_idb_migrated')) return;
   try {
@@ -63,7 +65,7 @@ const migrationPromise = (async () => {
       for (const s of sessions) { await idbPut(s); }
       localStorage.removeItem('aneh_sessions');
     }
-  } catch 
+  } catch { /* gpp kalo gagal, ga fatal */ }
   localStorage.setItem('aneh_idb_migrated', '1');
 })();
 
@@ -135,7 +137,11 @@ const Storage = {
     };
   },
 
- async getStorageUsage() {
+  // ── Storage usage (akurat, pake browser API beneran) ─────────
+  // navigator.storage.estimate() ngasih tau pemakaian REAL gabungan
+  // localStorage + IndexedDB, dan quota REAL yang dikasih browser
+  // (biasanya jauh lebih dari 5-10MB kalo pake IndexedDB).
+  async getStorageUsage() {
     if (navigator.storage && navigator.storage.estimate) {
       try {
         const { usage = 0, quota = 0 } = await navigator.storage.estimate();
