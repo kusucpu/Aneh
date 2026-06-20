@@ -42,13 +42,34 @@
   </div>
 
   <div class="input-area">
+    <div id="attachment-preview" class="attachment-preview hidden"></div>
     <div class="input-box">
+      <div class="attach-wrap">
+        <button class="btn-plus" id="btn-plus" title="Tambah">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+
+        <div class="attach-menu" id="attach-menu">
+          <div id="attach-menu-root">
+            <button class="attach-menu-item" data-action="upload">📎 <span>Upload File</span></button>
+            <button class="attach-menu-item" data-action="image">🖼️ <span>Generate Gambar</span></button>
+            <button class="attach-menu-item" data-action="audio">🎵 <span>Generate Audio</span></button>
+            <button class="attach-menu-item" data-action="music">🎶 <span>Generate Musik</span></button>
+            <button class="attach-menu-item" data-action="video">🎬 <span>Generate Video</span></button>
+          </div>
+          <div id="attach-menu-ratio" class="hidden">
+            <button id="btn-ratio-back" class="attach-menu-back">← <span id="ratio-menu-title">Pilih ukuran</span></button>
+            <button class="ratio-option" data-ratio="1:1"><span class="ratio-box ratio-1-1"></span><span>1:1 <small>Persegi</small></span></button>
+            <button class="ratio-option" data-ratio="9:16"><span class="ratio-box ratio-9-16"></span><span>9:16 <small>Vertikal</small></span></button>
+            <button class="ratio-option" data-ratio="16:9"><span class="ratio-box ratio-16-9"></span><span>16:9 <small>Horizontal</small></span></button>
+          </div>
+        </div>
+      </div>
+
       <textarea id="chat-input" placeholder="Ketik sesuatu yang aneh…" rows="1" autocomplete="off" spellcheck="false"></textarea>
-      <button class="btn-image" id="btn-image" title="Generate gambar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-        </svg>
-      </button>
+
       <button class="btn-send" id="btn-send" disabled title="Kirim">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -56,6 +77,8 @@
       </button>
     </div>
   </div>
+
+  <input type="file" id="file-upload-input" accept="image/*,audio/*,.pdf,.doc,.docx,.txt" hidden>
 </div>
 
 <!-- Sidebar kanan -->
