@@ -1,46 +1,110 @@
-// ── Version migration ─────────────────────────────────────────────
-const SETTINGS_VERSION = 4;
-const VALID_PROVIDERS = ['groq', 'openrouter', 'gemini', 'pollinations'];
+const DB_NAME = 'aneh-db';
+const DB_VERSION = 1;
+const STORE = 'sessions';
 
-(function migrate() {
-  const stored = parseInt(localStorage.getItem('aneh_version') || '0');
-  if (stored < SETTINGS_VERSION) {
-    localStorage.removeItem('aneh_settings');
-    localStorage.setItem('aneh_version', String(SETTINGS_VERSION));
-  }
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB tidak didukung')); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGetAll() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPut(session) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(session);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbDelete(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+const migrationPromise = (async () => {
+  if (localStorage.getItem('aneh_idb_migrated')) return;
+  try {
+    const raw = localStorage.getItem('aneh_sessions');
+    if (raw) {
+      const sessions = JSON.parse(raw);
+      for (const s of sessions) { await idbPut(s); }
+      localStorage.removeItem('aneh_sessions');
+    }
+  } catch 
+  localStorage.setItem('aneh_idb_migrated', '1');
 })();
 
-// ── Default models ────────────────────────────────────────────────
+// ── Default models per provider ──────────────────────────────────
 const DEFAULT_MODELS = {
   groq:         'llama-3.3-70b-versatile',
   openrouter:   'meta-llama/llama-3.3-70b-instruct:free',
   gemini:       'gemini-2.0-flash',
   pollinations: 'openai',
 };
+const DEFAULT_IMAGE_MODELS = { pollinations: 'flux' };
+const VALID_PROVIDERS = ['groq', 'openrouter', 'gemini', 'pollinations'];
 
-const DEFAULT_IMAGE_MODELS = {
-  pollinations: 'flux',
-};
-
-// ── Storage ───────────────────────────────────────────────────────
 const Storage = {
-  getSessions() {
-    try { return JSON.parse(localStorage.getItem('aneh_sessions') || '[]'); } catch { return []; }
+  // ── Sessions (IndexedDB, async) ──────────────────────────────
+  async getSessions() {
+    await migrationPromise;
+    try {
+      const all = await idbGetAll();
+      return all.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } catch { return []; }
   },
-  saveSession(session) {
-    const sessions = this.getSessions();
-    const idx = sessions.findIndex(s => s.id === session.id);
-    if (idx >= 0) sessions[idx] = session; else sessions.unshift(session);
-    localStorage.setItem('aneh_sessions', JSON.stringify(sessions.slice(0, 60)));
+  async getSession(id) {
+    await migrationPromise;
+    try { return await idbGet(id); } catch { return null; }
   },
-  deleteSession(id) {
-    localStorage.setItem('aneh_sessions', JSON.stringify(this.getSessions().filter(s => s.id !== id)));
+  async saveSession(session) {
+    await migrationPromise;
+    try { await idbPut(session); return { ok: true }; }
+    catch { return { ok: false }; }
   },
-  getSession(id) { return this.getSessions().find(s => s.id === id) || null; },
+  async deleteSession(id) {
+    await migrationPromise;
+    try { await idbDelete(id); return true; } catch { return false; }
+  },
 
+  // ── Theme (localStorage, kecil, sync) ────────────────────────
   getTheme() { return localStorage.getItem('aneh_theme') || 'dark'; },
   saveTheme(t) { localStorage.setItem('aneh_theme', t); },
 
+  // ── Settings (localStorage, kecil, sync) ─────────────────────
   getSettings() {
     try { return JSON.parse(localStorage.getItem('aneh_settings') || '{}'); } catch { return {}; }
   },
@@ -50,31 +114,41 @@ const Storage = {
     localStorage.setItem('aneh_settings', JSON.stringify(merged));
     return merged;
   },
-
   getActiveChat() {
     const s = this.getSettings();
-    // Validasi provider — kalau invalid (e.g. 'together' dari versi lama), fall back ke groq
     let provider = s.chatProvider || 'groq';
-    if (!VALID_PROVIDERS.includes(provider)) {
-      provider = 'groq';
-      this.saveSettings({ chatProvider: 'groq' });
-    }
+    if (!VALID_PROVIDERS.includes(provider)) { provider = 'groq'; this.saveSettings({ chatProvider: 'groq' }); }
     return {
       provider,
-      apiKey:  s.apiKeys?.[provider]    || '',
-      model:   s.chatModels?.[provider] || DEFAULT_MODELS[provider] || '',
+      apiKey: s.apiKeys?.[provider] || '',
+      model:  s.chatModels?.[provider] || DEFAULT_MODELS[provider] || '',
     };
   },
-
   getActiveImage() {
     const s = this.getSettings();
     let provider = s.imageProvider || 'pollinations';
     if (!VALID_PROVIDERS.includes(provider)) provider = 'pollinations';
     return {
       provider,
-      apiKey: s.apiKeys?.[provider]     || '',
+      apiKey: s.apiKeys?.[provider] || '',
       model:  s.imageModels?.[provider] || DEFAULT_IMAGE_MODELS[provider] || 'flux',
     };
+  },
+
+ async getStorageUsage() {
+    if (navigator.storage && navigator.storage.estimate) {
+      try {
+        const { usage = 0, quota = 0 } = await navigator.storage.estimate();
+        return {
+          usedBytes: usage,
+          usedMB: usage / (1024 * 1024),
+          quotaMB: quota / (1024 * 1024),
+          percent: quota ? Math.min(100, (usage / quota) * 100) : 0,
+          supported: true,
+        };
+      } catch { /* fallthrough */ }
+    }
+    return { usedBytes: 0, usedMB: 0, quotaMB: 0, percent: 0, supported: false };
   },
 };
 
