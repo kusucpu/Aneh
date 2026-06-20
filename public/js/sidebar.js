@@ -46,10 +46,11 @@ export function initSidebar(onSelectSession, onNewChat) {
 }
 
 // ── History ───────────────────────────────────────────────────────
-export function renderHistory(activeId = null) {
+export async function renderHistory(activeId = null) {
   const list = document.getElementById('history-list');
   if (!list) return;
-  const sessions = Storage.getSessions();
+  list.innerHTML = `<div class="history-empty">Memuat riwayat…</div>`;
+  const sessions = await Storage.getSessions();
   if (!sessions.length) {
     list.innerHTML = `<div class="history-empty">Belum ada riwayat.<br>Mulai ngobrol dulu!</div>`;
     return;
@@ -70,9 +71,9 @@ export function renderHistory(activeId = null) {
     });
   });
   list.querySelectorAll('.history-item-delete').forEach(el => {
-    el.addEventListener('click', e => {
+    el.addEventListener('click', async e => {
       e.stopPropagation();
-      Storage.deleteSession(el.dataset.id);
+      await Storage.deleteSession(el.dataset.id);
       renderHistory(activeId);
       window._onDeleteSession?.(el.dataset.id);
     });
