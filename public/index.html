@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aneh</title>
   <meta name="description" content="Chat Aneh">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/sidebar.css">
   <link rel="stylesheet" href="/css/chat.css">
@@ -156,6 +157,19 @@
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <div class="toast" id="toast"></div>
+
+<!-- Lightbox -->
+<div class="lightbox-backdrop" id="lightbox-backdrop">
+  <div class="lightbox-toolbar">
+    <button id="btn-lightbox-download" class="lightbox-btn" title="Download">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+    <button id="btn-lightbox-close" class="lightbox-btn" title="Tutup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div id="lightbox-media-wrap" class="lightbox-media-wrap"></div>
+</div>
 
 <script type="module" src="/js/app.js"></script>
 </body>
