@@ -6,12 +6,15 @@ let isStreaming = false;
 let pendingAttachment = null; // {kind:'image'|'file', dataUrl, name}
 
 const ICONS = {
-  copy:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
-  edit:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
-  delete: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
-  regen:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`,
+  copy:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  edit:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  delete:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
+  regen:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`,
+  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  play:     `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
 };
 
+// ── Pesan error kocak biar ga horor pas eror ────────────────────────
 const FUNNY_ERRORS = [
   'Modelnya lagi ngambek, mungkin kuota gratisannya abis 😅 Coba ganti model lain di Pengaturan ya!',
   'Waduh, server AI-nya lagi pura-pura gak denger. Gonta-ganti model dulu deh, gas terus!',
@@ -21,6 +24,32 @@ const FUNNY_ERRORS = [
   'Hmm model ini lagi bad mood. Ganti aja, banyak kok temennya di Pengaturan 😎',
 ];
 function funnyError() { return FUNNY_ERRORS[Math.floor(Math.random() * FUNNY_ERRORS.length)]; }
+
+// ── Peringatan storage (TANPA auto-hapus, user yang putusin) ───────
+let storageWarned = false;
+const STORAGE_FULL_MSGS = [
+  "Waduh kak, penyimpanan chat udah sesek banget nih (~{mb}MB / {q}MB)! Mau hapus beberapa history lama? Atau cuek aja, tapi kalo nanti app-nya lemot/error jangan kaget ya 😅🙏",
+  "Gawat darurat penyimpanan! 🚨 Udah ~{mb}MB kepake dari {q}MB. Yuk beberes history yang ga kepake, biar app-nya napas lega. Males? Yaudah tanggung sendiri hehe~",
+  "Memori lokal kamu udah penuh sesek kayak kereta jam pulang kantor (~{mb}MB / {q}MB) 🚆 Sok atuh hapus history lama, atau lanjut aja resiko ditanggung penumpang 😏",
+];
+const STORAGE_SAVE_FAILED_MSGS = [
+  "Yah, beneran penuh nih, chat ini GA kesimpen permanen 💔 Hapus history dulu yuk biar muat lagi.",
+  "Storage-nya udah mentok, pesan ini cuma numpang lewat doang ga ke-save 😵 Beresin history lama dulu ya.",
+  "Gagal nyimpen nih, kapasitasnya abis. Hapus beberapa chat lama dulu baru gas lagi 🙏",
+];
+async function checkStorageWarning() {
+  const usage = await Storage.getStorageUsage();
+  if (!usage.supported) return;
+  if (usage.percent >= 80 && !storageWarned) {
+    storageWarned = true;
+    const msg = STORAGE_FULL_MSGS[Math.floor(Math.random() * STORAGE_FULL_MSGS.length)]
+      .replace('{mb}', usage.usedMB.toFixed(1))
+      .replace('{q}', usage.quotaMB.toFixed(0));
+    showToast(msg, 6000);
+  } else if (usage.percent < 70) {
+    storageWarned = false;
+  }
+}
 
 // ── Ratio untuk gambar & video ───────────────────────────────────────
 const RATIOS = [
@@ -60,17 +89,23 @@ export function initChat() {
   fileInput?.addEventListener('change', handleFileSelected);
   document.getElementById('btn-remove-attachment')?.addEventListener('click', clearAttachment);
 
+  // Lightbox controls
+  document.getElementById('btn-lightbox-close')?.addEventListener('click', closeLightbox);
+  document.getElementById('lightbox-backdrop')?.addEventListener('click', (e) => {
+    if (e.target.id === 'lightbox-backdrop') closeLightbox();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+
   renderInputState();
   newChat();
 }
 
 // ── Attach menu ───────────────────────────────────────────────────
-let ratioMode = null; // 'image' | 'video'
+let ratioMode = null;
 
 function toggleAttachMenu() {
   const menu = document.getElementById('attach-menu');
-  const isShown = menu.classList.contains('show');
-  isShown ? closeAttachMenu() : openAttachMenu();
+  menu.classList.contains('show') ? closeAttachMenu() : openAttachMenu();
 }
 function openAttachMenu() {
   showAttachMenuRoot();
@@ -99,11 +134,9 @@ function handleAttachAction(action) {
   } else if (action === 'image' || action === 'video') {
     showRatioMenu(action);
   } else if (action === 'audio') {
-    closeAttachMenu();
-    generateAudio();
+    closeAttachMenu(); generateAudio();
   } else if (action === 'music') {
-    closeAttachMenu();
-    generateMusic();
+    closeAttachMenu(); generateMusic();
   }
 }
 
@@ -125,11 +158,7 @@ function handleFileSelected(e) {
   }
   const reader = new FileReader();
   reader.onload = () => {
-    pendingAttachment = {
-      kind: file.type.startsWith('image/') ? 'image' : 'file',
-      dataUrl: reader.result,
-      name: file.name,
-    };
+    pendingAttachment = { kind: file.type.startsWith('image/') ? 'image' : 'file', dataUrl: reader.result, name: file.name };
     renderAttachmentPreview();
     document.getElementById('btn-send').disabled = false;
   };
@@ -142,26 +171,22 @@ function renderAttachmentPreview() {
   if (!pendingAttachment) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   box.classList.remove('hidden');
   if (pendingAttachment.kind === 'image') {
-    box.innerHTML = `
-      <img src="${pendingAttachment.dataUrl}" class="attachment-thumb">
+    box.innerHTML = `<img src="${pendingAttachment.dataUrl}" class="attachment-thumb">
       <span class="attachment-name">${esc(pendingAttachment.name)}</span>
       <button id="btn-remove-attachment" class="btn-remove-attachment" title="Hapus">✕</button>`;
   } else {
-    box.innerHTML = `
-      <span class="attachment-file-icon">📎</span>
+    box.innerHTML = `<span class="attachment-file-icon">📎</span>
       <span class="attachment-name">${esc(pendingAttachment.name)}</span>
       <button id="btn-remove-attachment" class="btn-remove-attachment" title="Hapus">✕</button>`;
   }
   document.getElementById('btn-remove-attachment').addEventListener('click', clearAttachment);
 }
-
 function clearAttachment() {
   pendingAttachment = null;
   renderAttachmentPreview();
   const input = document.getElementById('chat-input');
   document.getElementById('btn-send').disabled = !input.value.trim();
 }
-
 function renderInputState() { renderAttachmentPreview(); }
 
 // ── Session ───────────────────────────────────────────────────────
@@ -171,8 +196,8 @@ export function newChat() {
   renderMessages();
 }
 
-export function loadSession(id) {
-  const s = Storage.getSession(id);
+export async function loadSession(id) {
+  const s = await Storage.getSession(id);
   if (!s) return;
   currentSession = JSON.parse(JSON.stringify(s));
   clearAttachment();
@@ -202,6 +227,7 @@ function createBubble(msg, idx) {
   const content = document.createElement('div');
   content.className = 'bubble-content';
   content.innerHTML = renderBubbleContent(msg);
+  bindMediaHandlers(content);
   bubble.appendChild(content);
 
   const actions = document.createElement('div');
@@ -220,42 +246,81 @@ function createBubble(msg, idx) {
   wrap.appendChild(bubble);
   wrap.appendChild(actions);
 
-  actions.addEventListener('click', e => {
+  actions.addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const i = parseInt(wrap.dataset.idx);
     if (btn.dataset.action === 'copy') {
       const m = currentSession.messages[i];
-      navigator.clipboard.writeText(m.type ? (m.content || '') : m.content);
+      navigator.clipboard.writeText(m.content || '');
       showToast('Disalin!');
     }
-    if (btn.dataset.action === 'delete') { currentSession.messages.splice(i,1); saveSession(); renderMessages(); }
+    if (btn.dataset.action === 'delete') { currentSession.messages.splice(i,1); await saveSession(); renderMessages(); }
     if (btn.dataset.action === 'edit') startInlineEdit(wrap, bubble, content, i);
-    if (btn.dataset.action === 'regen') { currentSession.messages.splice(i,1); saveSession(); renderMessages(); streamResponse(); }
+    if (btn.dataset.action === 'regen') { currentSession.messages.splice(i,1); await saveSession(); renderMessages(); streamResponse(); }
   });
 
   return wrap;
 }
 
+function bindMediaHandlers(content) {
+  content.querySelectorAll('[data-lightbox]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.media-icon-btn')) return;
+      const kind = el.dataset.lightbox;
+      const src = kind === 'video' ? el.dataset.src : el.querySelector('img')?.src || el.src;
+      openLightbox(src, kind);
+    });
+  });
+  content.querySelectorAll('[data-dl]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); downloadFile(btn.dataset.dl); });
+  });
+}
+
+function openLightbox(url, kind) {
+  const wrap = document.getElementById('lightbox-media-wrap');
+  wrap.innerHTML = kind === 'video'
+    ? `<video src="${url}" controls autoplay class="lightbox-media"></video>`
+    : `<img src="${url}" class="lightbox-media">`;
+  document.getElementById('btn-lightbox-download').onclick = () => downloadFile(url);
+  document.getElementById('lightbox-backdrop').classList.add('show');
+}
+function closeLightbox() {
+  document.getElementById('lightbox-backdrop')?.classList.remove('show');
+  const wrap = document.getElementById('lightbox-media-wrap');
+  if (wrap) wrap.innerHTML = '';
+}
+function downloadFile(url) {
+  const a = document.createElement('a');
+  a.href = url; a.download = ''; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 function renderBubbleContent(msg) {
-  if (msg.type === 'image') {
-    return `<img src="${msg.content}" alt="Generated image" class="generated-media" loading="lazy">
-      <a href="${msg.content}" target="_blank" class="img-open-link">Buka gambar ↗</a>`;
+  if (msg.type === 'image' || (msg.type === 'upload' && msg.kind === 'image')) {
+    return `
+      <div class="media-wrap">
+        <img src="${msg.content}" alt="media" class="generated-media thumb" loading="lazy" data-lightbox="image">
+        <button class="media-icon-btn" data-dl="${msg.content}" title="Download">${ICONS.download}</button>
+      </div>
+      ${msg.caption ? `<div class="upload-caption">${esc(msg.caption)}</div>` : ''}`;
   }
   if (msg.type === 'video') {
-    return `<video controls class="generated-media" src="${msg.content}"></video>`;
+    return `
+      <div class="media-wrap" data-lightbox="video" data-src="${msg.content}">
+        <video class="generated-media thumb" src="${msg.content}" muted preload="metadata"></video>
+        <div class="video-play-overlay">${ICONS.play}</div>
+        <button class="media-icon-btn" data-dl="${msg.content}" title="Download">${ICONS.download}</button>
+      </div>`;
   }
-  if (msg.type === 'audio') {
-    return `<div class="media-bubble">🎵 <audio controls src="${msg.content}"></audio></div>`;
-  }
-  if (msg.type === 'music') {
-    return `<div class="media-bubble">🎶 <audio controls src="${msg.content}"></audio></div>`;
+  if (msg.type === 'audio' || msg.type === 'music') {
+    return `<div class="media-bubble">
+      <span>${msg.type === 'music' ? '🎶' : '🎵'}</span>
+      <audio controls src="${msg.content}"></audio>
+      <button class="media-icon-btn static" data-dl="${msg.content}" title="Download">${ICONS.download}</button>
+    </div>`;
   }
   if (msg.type === 'upload') {
-    if (msg.kind === 'image') {
-      return `<img src="${msg.content}" alt="upload" class="generated-media">
-        ${msg.caption ? `<div class="upload-caption">${esc(msg.caption)}</div>` : ''}`;
-    }
     return `<div class="file-chip">📎 ${esc(msg.fileName || 'File')}</div>
       ${msg.caption ? `<div class="upload-caption">${esc(msg.caption)}</div>` : ''}`;
   }
@@ -277,12 +342,12 @@ function startInlineEdit(wrap, bubble, content, idx) {
   wrap.querySelector('.bubble-actions').style.display = 'none';
   ta.focus();
   btnRow.querySelector('.btn-cancel-edit').addEventListener('click', () => renderMessages());
-  btnRow.querySelector('.btn-save-edit').addEventListener('click', () => {
+  btnRow.querySelector('.btn-save-edit').addEventListener('click', async () => {
     const newText = ta.value.trim();
     if (!newText) return;
     currentSession.messages[idx].content = newText;
     currentSession.messages = currentSession.messages.slice(0, idx + 1);
-    saveSession(); renderMessages(); streamResponse();
+    await saveSession(); renderMessages(); streamResponse();
   });
 }
 
@@ -295,16 +360,13 @@ async function sendMessage() {
 
   if (pendingAttachment) {
     currentSession.messages.push({
-      role: 'user', type: 'upload',
-      kind: pendingAttachment.kind,
-      content: pendingAttachment.dataUrl,
-      fileName: pendingAttachment.name,
-      caption: text,
+      role: 'user', type: 'upload', kind: pendingAttachment.kind,
+      content: pendingAttachment.dataUrl, fileName: pendingAttachment.name, caption: text,
     });
     if (!currentSession.title) currentSession.title = (text || pendingAttachment.name).slice(0, 45);
     clearAttachment();
     input.value = ''; input.style.height = 'auto';
-    saveSession(); renderMessages();
+    await saveSession(); renderMessages();
     showToast('File terupload! (fitur baca isi file masih dalam pengembangan 🐣)');
     return;
   }
@@ -313,7 +375,7 @@ async function sendMessage() {
   document.getElementById('btn-send').disabled = true;
   currentSession.messages.push({ role: 'user', content: text });
   if (!currentSession.title) currentSession.title = text.slice(0, 45) + (text.length > 45 ? '…' : '');
-  saveSession(); renderMessages();
+  await saveSession(); renderMessages();
   await streamResponse();
 }
 
@@ -328,7 +390,7 @@ async function generateImage(ratio) {
 
   currentSession.messages.push({ role: 'user', content: `🖼️ ${prompt} (${ratio})` });
   if (!currentSession.title) currentSession.title = `🖼️ ${prompt}`.slice(0, 45);
-  saveSession(); renderMessages();
+  await saveSession(); renderMessages();
 
   const imgSettings = Storage.getActiveImage();
   const loading = pushLoadingBubble();
@@ -340,9 +402,9 @@ async function generateImage(ratio) {
     });
     loading.remove();
     const data = await res.json();
-    if (data.error) { appendError(); return; }
+    if (data.error) { appendError(); finishStreamingState(); return; }
     currentSession.messages.push({ role: 'assistant', content: data.url, type: 'image' });
-    saveSession(); renderMessages(); renderHistory(currentSession.id);
+    await saveSession(); renderMessages(); renderHistory(currentSession.id);
   } catch { loading.remove(); appendError(); }
 
   finishStreamingState();
@@ -359,7 +421,7 @@ async function generateVideo(ratio) {
 
   currentSession.messages.push({ role: 'user', content: `🎬 ${prompt} (${ratio})` });
   if (!currentSession.title) currentSession.title = `🎬 ${prompt}`.slice(0, 45);
-  saveSession(); renderMessages();
+  await saveSession(); renderMessages();
 
   const loading = pushLoadingBubble();
   try {
@@ -369,9 +431,9 @@ async function generateVideo(ratio) {
     });
     loading.remove();
     const data = await res.json();
-    if (data.error) { appendError(); return; }
+    if (data.error) { appendError(); finishStreamingState(); return; }
     currentSession.messages.push({ role: 'assistant', content: data.url, type: 'video' });
-    saveSession(); renderMessages(); renderHistory(currentSession.id);
+    await saveSession(); renderMessages(); renderHistory(currentSession.id);
   } catch { loading.remove(); appendError(); }
 
   finishStreamingState();
@@ -388,7 +450,7 @@ async function generateAudio() {
 
   currentSession.messages.push({ role: 'user', content: `🎵 ${prompt}` });
   if (!currentSession.title) currentSession.title = `🎵 ${prompt}`.slice(0, 45);
-  saveSession(); renderMessages();
+  await saveSession(); renderMessages();
 
   const loading = pushLoadingBubble();
   try {
@@ -398,9 +460,9 @@ async function generateAudio() {
     });
     loading.remove();
     const data = await res.json();
-    if (data.error) { appendError(); return; }
+    if (data.error) { appendError(); finishStreamingState(); return; }
     currentSession.messages.push({ role: 'assistant', content: data.url, type: 'audio' });
-    saveSession(); renderMessages(); renderHistory(currentSession.id);
+    await saveSession(); renderMessages(); renderHistory(currentSession.id);
   } catch { loading.remove(); appendError(); }
 
   finishStreamingState();
@@ -417,7 +479,7 @@ async function generateMusic() {
 
   currentSession.messages.push({ role: 'user', content: `🎶 ${prompt}` });
   if (!currentSession.title) currentSession.title = `🎶 ${prompt}`.slice(0, 45);
-  saveSession(); renderMessages();
+  await saveSession(); renderMessages();
 
   const loading = pushLoadingBubble();
   try {
@@ -427,9 +489,9 @@ async function generateMusic() {
     });
     loading.remove();
     const data = await res.json();
-    if (data.error) { appendError(); return; }
+    if (data.error) { appendError(); finishStreamingState(); return; }
     currentSession.messages.push({ role: 'assistant', content: data.url, type: 'music' });
-    saveSession(); renderMessages(); renderHistory(currentSession.id);
+    await saveSession(); renderMessages(); renderHistory(currentSession.id);
   } catch { loading.remove(); appendError(); }
 
   finishStreamingState();
@@ -503,7 +565,7 @@ async function streamResponse() {
     if (!fullText.trim()) { aiWrap.remove(); appendError(); finishStreamingState(); return; }
 
     currentSession.messages.push({ role: 'assistant', content: fullText });
-    saveSession(); renderMessages(); renderHistory(currentSession.id);
+    await saveSession(); renderMessages(); renderHistory(currentSession.id);
   } catch { typing.remove(); appendError(); }
 
   finishStreamingState();
@@ -517,15 +579,26 @@ function appendError() {
   inner.appendChild(el); scrollToBottom();
 }
 
-function saveSession() { Storage.saveSession(currentSession); window._currentSessionId = currentSession.id; }
+async function saveSession() {
+  const result = await Storage.saveSession(currentSession);
+  window._currentSessionId = currentSession.id;
+  if (!result.ok) {
+    const msg = STORAGE_SAVE_FAILED_MSGS[Math.floor(Math.random() * STORAGE_SAVE_FAILED_MSGS.length)];
+    showToast(msg, 6000);
+  } else {
+    checkStorageWarning();
+  }
+}
+
 function scrollToBottom() { const el = document.getElementById('messages'); el.scrollTop = el.scrollHeight; }
 function renderMarkdown(text) {
   if (typeof marked === 'undefined') return esc(text).replace(/\n/g,'<br>');
   try { return marked.parse(text, { breaks:true, gfm:true }); } catch { return esc(text); }
 }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-export function showToast(msg) {
+export function showToast(msg, duration = 2200) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove('show'), duration);
 }
