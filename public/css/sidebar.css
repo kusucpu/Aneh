@@ -58,12 +58,45 @@
 }
 .history-item:hover { background: var(--bg-3); color: var(--text); }
 .history-item.active { background: var(--accent-dim); color: var(--text); }
-.history-item svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.5; }
-.history-item-delete { margin-left: auto; opacity: 0; padding: 2px; color: var(--text-3); flex-shrink: 0; border-radius: 4px; }
-.history-item:hover .history-item-delete { opacity: 1; }
-.history-item-delete:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
-.history-item-delete svg { width: 12px; height: 12px; display: block; }
+.history-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.pin-badge { font-size: 11px; flex-shrink: 0; opacity: 0.85; }
+
+.history-item-menu-btn {
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-3);
+}
+.history-item-menu-btn:hover { background: var(--border); color: var(--text-2); }
+.history-item-menu-btn svg { width: 14px; height: 14px; }
+
+.history-rename-input {
+  flex: 1; background: var(--bg-3); border: 1px solid var(--accent);
+  border-radius: 5px; padding: 3px 6px; font-size: 13px; color: var(--text);
+  min-width: 0;
+}
+
 .history-empty { padding: 20px 16px; font-size: 12px; color: var(--text-3); text-align: center; line-height: 1.7; }
+
+/* ── Context menu (Edit Judul / Pin / Hapus) ──────────────────── */
+.history-context-menu {
+  display: none;
+  position: fixed;
+  min-width: 160px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  padding: 6px;
+  z-index: 500;
+}
+.history-context-menu.show { display: block; }
+.history-context-menu button {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 7px; font-size: 13px;
+  color: var(--text); text-align: left;
+}
+.history-context-menu button:hover { background: var(--bg-3); }
+.history-context-menu button.danger:hover { background: rgba(239,68,68,0.1); color: var(--danger); }
 
 /* Settings view */
 .sidebar-view-settings {
@@ -195,3 +228,6 @@
   padding: 7px 10px;
   line-height: 1.5;
 }
+
+.settings-section-block { display: flex; flex-direction: column; gap: 8px; }
+.settings-divider { border-top: 1px solid var(--border); margin: 2px 0; }
