@@ -5,6 +5,14 @@ let currentSession = null;
 let isStreaming = false;
 let pendingAttachment = null; // {kind:'image'|'file', dataUrl, name}
 
+const LOGO_MARK = `<svg class="welcome-logo" viewBox="0 0 40 40" width="56" height="56">
+  <path d="M8,15 C8,7 14,3 22,4 C30,5 35,9 34,17 C33,25 30,31 22,33 C14,35 6,31 5,23 C4,19 5,17 8,15 Z" fill="currentColor"/>
+  <path d="M10,31 C9,34 7,36 5,37 C8,36 11,35 13,32 Z" fill="currentColor"/>
+  <circle cx="15" cy="16" r="2.6" fill="var(--bg)"/>
+  <circle cx="25" cy="15" r="1.8" fill="var(--bg)"/>
+  <path d="M14,24 Q18,28 22,24 Q26,20 28,24" stroke="var(--bg)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+</svg>`;
+
 const ICONS = {
   copy:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   edit:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
@@ -208,7 +216,7 @@ export async function loadSession(id) {
 function renderMessages() {
   const inner = document.getElementById('messages-inner');
   if (!currentSession.messages.length) {
-    inner.innerHTML = `<div class="welcome"><h2>Aneh.</h2><p>Chat aneh dimulai dari sini.</p></div>`;
+    inner.innerHTML = `<div class="welcome">${LOGO_MARK}<h2>Aneh.</h2><p>Chat aneh dimulai dari sini.</p></div>`;
     return;
   }
   inner.innerHTML = '';
