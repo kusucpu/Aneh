@@ -109,40 +109,60 @@
   <!-- Settings view -->
   <div class="sidebar-view-settings hidden" id="sidebar-view-settings">
 
-    <div>
-      <label class="settings-label">Provider API</label>
-      <select id="settings-provider" class="settings-select"></select>
-    </div>
+    <div class="settings-section-block">
+      <label class="settings-label">💬 Provider Teks (Chat)</label>
+      <select id="settings-chat-provider" class="settings-select"></select>
 
-    <div class="settings-key-section" id="settings-key-section">
-      <div class="settings-key-header">
-        <label class="settings-label" style="margin:0">API Key</label>
-        <span class="key-status" id="settings-key-status">○ Belum diset</span>
+      <div class="settings-key-section" id="settings-chat-key-section">
+        <div class="settings-key-header">
+          <label class="settings-label" style="margin:0">API Key</label>
+          <span class="key-status" id="settings-chat-key-status">○ Belum diset</span>
+        </div>
+        <div class="settings-key-input-wrap">
+          <input type="password" id="settings-chat-key-input" placeholder="Masukkan key...">
+          <button id="btn-toggle-chat-key" title="Tampilkan/sembunyikan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <button id="btn-save-chat-key" class="btn-save-key">Simpan Key</button>
       </div>
-      <div class="settings-key-input-wrap">
-        <input type="password" id="settings-key-input" placeholder="Masukkan key...">
-        <button id="btn-toggle-settings-key" title="Tampilkan/sembunyikan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
+      <div id="settings-chat-provider-note" class="settings-note" style="display:none"></div>
+
+      <div class="settings-models-section">
+        <label class="settings-label">Model</label>
+        <div id="settings-chat-models"></div>
       </div>
-      <button id="btn-save-settings-key" class="btn-save-key">Simpan Key</button>
     </div>
 
-    <div id="settings-provider-note" class="settings-note" style="display:none"></div>
+    <div class="settings-divider"></div>
 
-    <div class="settings-models-section">
-      <label class="settings-label">Model Chat</label>
-      <div id="settings-chat-models"></div>
-    </div>
+    <div class="settings-section-block">
+      <label class="settings-label">🎨 Provider Media (Gambar / Audio / Musik / Video)</label>
+      <select id="settings-media-provider" class="settings-select"></select>
 
-    <div class="settings-models-section hidden" id="settings-image-models">
-      <label class="settings-label">🖼️ Model Gambar</label>
-      <div id="settings-image-models-list"></div>
-    </div>
+      <div class="settings-key-section" id="settings-media-key-section">
+        <div class="settings-key-header">
+          <label class="settings-label" style="margin:0">API Key</label>
+          <span class="key-status" id="settings-media-key-status">○ Belum diset</span>
+        </div>
+        <div class="settings-key-input-wrap">
+          <input type="password" id="settings-media-key-input" placeholder="Masukkan key...">
+          <button id="btn-toggle-media-key" title="Tampilkan/sembunyikan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <button id="btn-save-media-key" class="btn-save-key">Simpan Key</button>
+      </div>
+      <div id="settings-media-provider-note" class="settings-note" style="display:none"></div>
 
-    <div class="settings-models-section hidden" id="settings-audio-models">
-      <label class="settings-label">🎵 Model Audio</label>
-      <div id="settings-audio-models-list"></div>
+      <div class="settings-models-section">
+        <label class="settings-label">🖼️ Model Gambar</label>
+        <div id="settings-image-models-list"></div>
+      </div>
+      <div class="settings-models-section">
+        <label class="settings-label">🎵 Model Audio</label>
+        <div id="settings-audio-models-list"></div>
+      </div>
     </div>
 
   </div>
