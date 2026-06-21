@@ -55,7 +55,6 @@ async function idbDelete(id) {
 }
 
 // ── Migrasi sekali jalan: localStorage lama -> IndexedDB ──────────
-// Biar history chat yang udah ada sebelum update ini ga hilang.
 const migrationPromise = (async () => {
   if (localStorage.getItem('aneh_idb_migrated')) return;
   try {
@@ -65,7 +64,9 @@ const migrationPromise = (async () => {
       for (const s of sessions) { await idbPut(s); }
       localStorage.removeItem('aneh_sessions');
     }
-  } catch { /* gpp kalo gagal, ga fatal */ }
+  } catch {
+    /* gpp kalo gagal, ga fatal */
+  }
   localStorage.setItem('aneh_idb_migrated', '1');
 })();
 
@@ -85,7 +86,10 @@ const Storage = {
     await migrationPromise;
     try {
       const all = await idbGetAll();
-      return all.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return all.sort((a, b) => {
+        if (!!b.pinned !== !!a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
     } catch { return []; }
   },
   async getSession(id) {
@@ -136,11 +140,24 @@ const Storage = {
       model:  s.imageModels?.[provider] || DEFAULT_IMAGE_MODELS[provider] || 'flux',
     };
   },
+  getActiveAudio() {
+    const s = this.getSettings();
+    let provider = s.imageProvider || 'pollinations'; // provider media yg sama dipakai utk image/audio/video
+    if (!VALID_PROVIDERS.includes(provider)) provider = 'pollinations';
+    return {
+      provider,
+      apiKey: s.apiKeys?.[provider] || '',
+      model:  s.audioModels?.[provider] || '',
+    };
+  },
+  getActiveMediaProvider() {
+    const s = this.getSettings();
+    let provider = s.imageProvider || 'pollinations';
+    if (!VALID_PROVIDERS.includes(provider)) provider = 'pollinations';
+    return { provider, apiKey: s.apiKeys?.[provider] || '' };
+  },
 
   // ── Storage usage (akurat, pake browser API beneran) ─────────
-  // navigator.storage.estimate() ngasih tau pemakaian REAL gabungan
-  // localStorage + IndexedDB, dan quota REAL yang dikasih browser
-  // (biasanya jauh lebih dari 5-10MB kalo pake IndexedDB).
   async getStorageUsage() {
     if (navigator.storage && navigator.storage.estimate) {
       try {
