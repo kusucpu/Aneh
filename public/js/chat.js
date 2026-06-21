@@ -423,11 +423,12 @@ async function generateVideo(ratio) {
   if (!currentSession.title) currentSession.title = `🎬 ${prompt}`.slice(0, 45);
   await saveSession(); renderMessages();
 
+  const mediaSettings = Storage.getActiveMediaProvider();
   const loading = pushLoadingBubble();
   try {
     const res = await fetch('/api/video', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, ratio }),
+      body: JSON.stringify({ prompt, ratio, apiKey: mediaSettings.apiKey }),
     });
     loading.remove();
     const data = await res.json();
@@ -452,11 +453,17 @@ async function generateAudio() {
   if (!currentSession.title) currentSession.title = `🎵 ${prompt}`.slice(0, 45);
   await saveSession(); renderMessages();
 
+  const audioSettings = Storage.getActiveAudio();
   const loading = pushLoadingBubble();
   try {
     const res = await fetch('/api/audio', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: prompt, voice: 'nova' }),
+      body: JSON.stringify({
+        text: prompt,
+        voice: audioSettings.model ? undefined : 'nova',
+        model: audioSettings.model || undefined,
+        apiKey: audioSettings.apiKey,
+      }),
     });
     loading.remove();
     const data = await res.json();
@@ -481,11 +488,12 @@ async function generateMusic() {
   if (!currentSession.title) currentSession.title = `🎶 ${prompt}`.slice(0, 45);
   await saveSession(); renderMessages();
 
+  const mediaSettings = Storage.getActiveMediaProvider();
   const loading = pushLoadingBubble();
   try {
     const res = await fetch('/api/audio', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: prompt, model: 'elevenmusic' }),
+      body: JSON.stringify({ text: prompt, model: 'elevenmusic', apiKey: mediaSettings.apiKey }),
     });
     loading.remove();
     const data = await res.json();
