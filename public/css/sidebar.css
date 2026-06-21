@@ -19,6 +19,8 @@
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+.sidebar-brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.logo-mark { color: var(--text); flex-shrink: 0; }
 .sidebar-logo { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; color: var(--text); line-height: 1; }
 .sidebar-logo span { color: var(--text-3); font-weight: 300; font-size: 11px; display: block; margin-top: 2px; }
 .btn-sidebar-close {
