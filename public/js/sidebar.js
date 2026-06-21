@@ -46,7 +46,11 @@ export function initSidebar(onSelectSession, onNewChat) {
 }
 
 // ── History ───────────────────────────────────────────────────────
+let lastActiveId = null;
+
 export async function renderHistory(activeId = null) {
+  lastActiveId = activeId;
+  ensureContextMenu();
   const list = document.getElementById('history-list');
   if (!list) return;
   list.innerHTML = `<div class="history-empty">Memuat riwayat…</div>`;
@@ -57,95 +61,186 @@ export async function renderHistory(activeId = null) {
   }
   list.innerHTML = sessions.map(s => `
     <div class="history-item ${s.id === activeId ? 'active':''}" data-id="${s.id}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span>${esc(s.title || 'Chat tanpa judul')}</span>
-      <button class="history-item-delete" data-id="${s.id}" title="Hapus">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      <button class="history-item-menu-btn" data-id="${s.id}" title="Opsi">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
       </button>
+      <span class="history-title">${esc(s.title || 'Chat tanpa judul')}</span>
+      ${s.pinned ? '<span class="pin-badge" title="Dipin">📌</span>' : ''}
     </div>`).join('');
 
   list.querySelectorAll('.history-item').forEach(el => {
     el.addEventListener('click', e => {
-      if (e.target.closest('.history-item-delete')) return;
+      if (e.target.closest('.history-item-menu-btn')) return;
       window._onSelectSession?.(el.dataset.id);
     });
   });
-  list.querySelectorAll('.history-item-delete').forEach(el => {
-    el.addEventListener('click', async e => {
+  list.querySelectorAll('.history-item-menu-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
       e.stopPropagation();
-      await Storage.deleteSession(el.dataset.id);
-      renderHistory(activeId);
-      window._onDeleteSession?.(el.dataset.id);
+      const id = btn.dataset.id;
+      const sessions2 = await Storage.getSessions();
+      const session = sessions2.find(s => s.id === id);
+      if (session) openHistoryMenu(btn, session);
     });
   });
+}
+
+// ── Context menu (Edit Judul / Pin / Hapus) ───────────────────────
+function ensureContextMenu() {
+  if (document.getElementById('history-context-menu')) return;
+  const div = document.createElement('div');
+  div.id = 'history-context-menu';
+  div.className = 'history-context-menu';
+  document.body.appendChild(div);
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.history-item-menu-btn') && !e.target.closest('.history-context-menu')) {
+      closeHistoryMenu();
+    }
+  });
+}
+function closeHistoryMenu() {
+  document.getElementById('history-context-menu')?.classList.remove('show');
+}
+
+function openHistoryMenu(btn, session) {
+  const menu = document.getElementById('history-context-menu');
+  menu.innerHTML = `
+    <button data-action="rename">✏️ <span>Edit Judul</span></button>
+    <button data-action="pin">📌 <span>${session.pinned ? 'Lepas Pin' : 'Pin Chat'}</span></button>
+    <button data-action="delete" class="danger">🗑️ <span>Hapus</span></button>`;
+
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = `${rect.bottom + 6}px`;
+  menu.style.left = `${Math.max(8, rect.left)}px`;
+  menu.classList.add('show');
+
+  menu.querySelectorAll('button[data-action]').forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const action = b.dataset.action;
+      closeHistoryMenu();
+      if (action === 'delete') {
+        await Storage.deleteSession(session.id);
+        renderHistory(lastActiveId);
+        window._onDeleteSession?.(session.id);
+      } else if (action === 'pin') {
+        session.pinned = !session.pinned;
+        await Storage.saveSession(session);
+        renderHistory(lastActiveId);
+      } else if (action === 'rename') {
+        startRenameInline(session.id);
+      }
+    };
+  });
+}
+
+async function startRenameInline(id) {
+  const item = document.querySelector(`.history-item[data-id="${id}"]`);
+  if (!item) return;
+  const titleSpan = item.querySelector('.history-title');
+  if (!titleSpan) return;
+  const current = titleSpan.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'history-rename-input';
+  input.value = current;
+  titleSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+    const newTitle = input.value.trim() || current;
+    const sessions = await Storage.getSessions();
+    const fresh = sessions.find(s => s.id === id);
+    if (fresh) { fresh.title = newTitle; await Storage.saveSession(fresh); }
+    renderHistory(lastActiveId);
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { committed = true; renderHistory(lastActiveId); }
+  });
+  input.addEventListener('blur', commit);
 }
 
 // ── Settings View ─────────────────────────────────────────────────
 function initSettingsView() {
-  const providerSel = document.getElementById('settings-provider');
-  if (!providerSel) return;
+  const chatProviderIds  = Object.keys(PROVIDERS);
+  const mediaProviderIds = Object.keys(PROVIDERS).filter(id => PROVIDERS[id].imageProvider);
 
-  providerSel.innerHTML = Object.entries(PROVIDERS)
-    .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('');
+  initProviderSection('chat', chatProviderIds, 'chatProvider');
+  initProviderSection('media', mediaProviderIds, 'imageProvider');
+}
+
+function initProviderSection(kind, providerIds, settingKey) {
+  const sel = document.getElementById(`settings-${kind}-provider`);
+  if (!sel || !providerIds.length) return;
+
+  sel.innerHTML = providerIds.map(id => `<option value="${id}">${PROVIDERS[id].name}</option>`).join('');
 
   const saved = Storage.getSettings();
-  let initialProvider = saved.chatProvider || 'groq';
-  if (!PROVIDERS[initialProvider]) {
-    initialProvider = 'groq';
-    Storage.saveSettings({ chatProvider: 'groq' });
+  let current = saved[settingKey] || providerIds[0];
+  if (!providerIds.includes(current)) {
+    current = providerIds[0];
+    Storage.saveSettings({ [settingKey]: current });
   }
-  providerSel.value = initialProvider;
+  sel.value = current;
 
-  renderSettingsForProvider(providerSel.value);
+  renderProviderDetails(kind, current, settingKey);
 
-  providerSel.onchange = () => {
-    Storage.saveSettings({ chatProvider: providerSel.value });
-    renderSettingsForProvider(providerSel.value);
+  sel.onchange = () => {
+    Storage.saveSettings({ [settingKey]: sel.value });
+    renderProviderDetails(kind, sel.value, settingKey);
   };
 }
 
-function renderSettingsForProvider(providerId) {
+function renderProviderDetails(kind, providerId, settingKey) {
   const cfg = PROVIDERS[providerId];
   const saved = Storage.getSettings();
   const currentKey = saved.apiKeys?.[providerId] || '';
 
-  // Key section
-  const keySection = document.getElementById('settings-key-section');
-  const noteEl = document.getElementById('settings-provider-note');
-
-  // Show key input for all providers (groq = optional, others = required)
-  keySection.classList.remove('hidden');
-  document.getElementById('settings-key-input').value = currentKey;
-  document.getElementById('settings-key-input').placeholder = cfg.placeholder;
+  const keyInput = document.getElementById(`settings-${kind}-key-input`);
+  const noteEl = document.getElementById(`settings-${kind}-provider-note`);
+  keyInput.value = currentKey;
+  keyInput.placeholder = cfg.placeholder;
 
   if (noteEl) {
     noteEl.textContent = cfg.note || '';
     noteEl.style.display = cfg.note ? 'block' : 'none';
   }
 
-  updateKeyStatus(!!currentKey, providerId);
+  updateKeyStatusFor(kind, !!currentKey, providerId);
 
-  // Bind save key
-  document.getElementById('btn-save-settings-key').onclick = () => {
-    const val = document.getElementById('settings-key-input').value.trim();
+  document.getElementById(`btn-save-${kind}-key`).onclick = () => {
+    const val = keyInput.value.trim();
     Storage.saveSettings({ apiKeys: { [providerId]: val } });
-    updateKeyStatus(!!val, providerId);
-    loadAllModels(providerId, val);
+    updateKeyStatusFor(kind, !!val, providerId);
+    loadModelsForSection(kind, providerId, val);
     showToast(val ? '✓ Key tersimpan' : 'Key dikosongkan');
   };
 
-  document.getElementById('btn-toggle-settings-key').onclick = () => {
-    const inp = document.getElementById('settings-key-input');
-    inp.type = inp.type === 'password' ? 'text' : 'password';
+  document.getElementById(`btn-toggle-${kind}-key`).onclick = () => {
+    keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
   };
 
-  loadAllModels(providerId, currentKey);
+  loadModelsForSection(kind, providerId, currentKey);
 }
 
-function updateKeyStatus(hasKey, providerId) {
-  const el = document.getElementById('settings-key-status');
+function loadModelsForSection(kind, providerId, apiKey) {
+  if (kind === 'chat') {
+    loadModelGroup(providerId, apiKey, providerId, 'settings-chat-models', 'chatModels');
+  } else {
+    loadModelGroup(providerId, apiKey, `${providerId}_image`, 'settings-image-models-list', 'imageModels');
+    loadModelGroup(providerId, apiKey, `${providerId}_audio`, 'settings-audio-models-list', 'audioModels');
+  }
+}
+
+function updateKeyStatusFor(kind, hasKey, providerId) {
+  const el = document.getElementById(`settings-${kind}-key-status`);
   if (!el) return;
-  const cfg = PROVIDERS[providerId || 'groq'];
+  const cfg = PROVIDERS[providerId];
   if (hasKey) {
     el.textContent = '● Key kamu aktif';
     el.className = 'key-status active';
@@ -155,33 +250,6 @@ function updateKeyStatus(hasKey, providerId) {
   } else {
     el.textContent = '○ Belum diset';
     el.className = 'key-status';
-  }
-}
-
-async function loadAllModels(providerId, apiKey) {
-  const cfg = PROVIDERS[providerId];
-
-  // Chat models
-  await loadModelGroup(providerId, apiKey, providerId, 'settings-chat-models', 'chatModels');
-
-  // Image models (only for providers that support it)
-  const imgSection = document.getElementById('settings-image-models');
-  if (cfg.imageProvider) {
-    imgSection.classList.remove('hidden');
-    await loadModelGroup(providerId, apiKey, `${providerId}_image`, 'settings-image-models-list', 'imageModels');
-
-    // Audio models (only Pollinations)
-    if (providerId === 'pollinations') {
-      const audioSection = document.getElementById('settings-audio-models');
-      if (audioSection) {
-        audioSection.classList.remove('hidden');
-        await loadModelGroup(providerId, apiKey, 'pollinations_audio', 'settings-audio-models-list', 'audioModels');
-      }
-    }
-  } else {
-    imgSection.classList.add('hidden');
-    const audioSection = document.getElementById('settings-audio-models');
-    if (audioSection) audioSection.classList.add('hidden');
   }
 }
 
